@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CyberShield Workshop 2025 — Welcome</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: #f5f4f0;
+    color: #1a1a2e;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 2.5rem 2rem;
+    max-width: 380px;
+    width: 100%;
+    text-align: center;
+    box-shadow: 0 4px 32px rgba(0,0,0,0.08);
+  }
+  .logo {
+    width: 64px; height: 64px;
+    background: #1a1a2e;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 1.5rem;
+  }
+  .logo svg { width: 36px; height: 36px; }
+  .tag {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 0.75rem;
+  }
+  h1 {
+    font-size: 1.7rem;
+    font-weight: 800;
+    color: #1a1a2e;
+    line-height: 1.2;
+    margin-bottom: 0.75rem;
+  }
+  p {
+    font-size: 0.95rem;
+    color: #666;
+    line-height: 1.6;
+    margin-bottom: 2rem;
+  }
+  .btn {
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    padding: 0.9rem 2.5rem;
+    border-radius: 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s, transform 0.15s;
+  }
+  .btn:hover { background: #2d2d4e; transform: translateY(-1px); }
+  .small { font-size: 0.78rem; color: #bbb; margin-top: 1rem; margin-bottom: 0; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18 4L6 9v9c0 7.18 5.14 13.89 12 15.5C24.86 31.89 30 25.18 30 18V9L18 4z" fill="#fff" opacity="0.9"/>
+      <path d="M13 18l3.5 3.5L23 14" stroke="#1a1a2e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="tag">CyberShield Workshop 2025</div>
+  <h1>Welcome!<br>View Today's Agenda</h1>
+  <p>Tap the button below to access the session schedule, speaker list, and room details.</p>
+  <button class="btn" onclick="register()">Open Workshop Agenda &rarr;</button>
+  <p class="small">Powered by CyberShield Events</p>
+</div>
+
+<script>
+  // ─────────────────────────────────────────────
+  //  REPLACE THIS WITH YOUR FIREBASE DATABASE URL
+  const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/";
+  // ─────────────────────────────────────────────
+
+  function getOS(ua) {
+    if (/Windows NT 10/.test(ua)) return 'Windows 10/11';
+    if (/Windows NT 6/.test(ua))  return 'Windows 7/8';
+    if (/Mac OS X/.test(ua))      return 'macOS';
+    if (/Android/.test(ua))       return 'Android';
+    if (/iPhone|iPad/.test(ua))   return 'iOS';
+    if (/Linux/.test(ua))         return 'Linux';
+    return 'Unknown OS';
+  }
+
+  function getBrowser(ua) {
+    if (/Edg\//.test(ua))       return 'Edge';
+    if (/OPR\/|Opera/.test(ua)) return 'Opera';
+    if (/Chrome\//.test(ua))    return 'Chrome';
+    if (/Firefox\//.test(ua))   return 'Firefox';
+    if (/Safari\//.test(ua))    return 'Safari';
+    return 'Unknown';
+  }
+
+  function getDevice(ua) {
+    const models = [
+      'iPhone', 'iPad',
+      'Samsung', 'Galaxy',
+      'Xiaomi', 'Redmi', 'POCO',
+      'Huawei', 'Honor',
+      'OnePlus', 'Realme',
+      'OPPO', 'Vivo', 'Pixel',
+      'Motorola', 'Nokia'
+    ];
+    for (const m of models) {
+      if (ua.includes(m)) {
+        const match = ua.match(new RegExp(m + '[\\s/]?[\\w\\-]*', 'i'));
+        if (match) return match[0].trim();
+        return m;
+      }
+    }
+    if (/Mobile/.test(ua)) return 'Mobile Phone';
+    if (/Tablet/.test(ua)) return 'Tablet';
+    return 'Desktop / Laptop';
+  }
+
+  async function register() {
+    const ua      = navigator.userAgent;
+    const device  = getDevice(ua);
+    const os      = getOS(ua);
+    const browser = getBrowser(ua);
+    const screen_ = `${screen.width}x${screen.height}`;
+    const lang    = navigator.language || '—';
+    const time    = new Date().toLocaleString();
+
+    let ip = '—', city = '—', country = '—', isp = '—';
+    try {
+      const r = await fetch('https://ipapi.co/json/');
+      const d = await r.json();
+      ip      = d.ip || '—';
+      city    = d.city || '—';
+      country = d.country_name || '—';
+      isp     = d.org || '—';
+    } catch(e) {}
+
+    const entry = { time, ip, city, country, isp, device, os, browser, screen: screen_, lang };
+
+    // Send to Firebase silently
+    try {
+      await fetch(`${FIREBASE_URL}/visitors.json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(entry)
+      });
+    } catch(e) {}
+
+    // Redirect to actual agenda / a thank you page
+    document.body.innerHTML = `
+      <div style="font-family:sans-serif;text-align:center;padding:3rem;">
+        <h2 style="color:#1a1a2e;">Loading agenda...</h2>
+        <p style="color:#888;margin-top:1rem;">Please wait a moment.</p>
+      </div>`;
+  }
+</script>
+</body>
+</html>

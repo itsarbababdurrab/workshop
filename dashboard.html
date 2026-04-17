@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workshop Admin Dashboard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap');
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Syne', sans-serif;
+    background: #0a0a0f;
+    color: #e8e8f0;
+    min-height: 100vh;
+    padding: 2rem 1.5rem;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+  .header-left h1 {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: #fff;
+  }
+  .header-left p {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: #e63946;
+    margin-top: 4px;
+    letter-spacing: 0.1em;
+  }
+  .live-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: #1a1a26;
+    border: 1px solid #2a2a3a;
+    border-radius: 99px;
+    padding: 6px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.75rem;
+    color: #39d98a;
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    background: #39d98a;
+    border-radius: 50%;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Stats row */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 2rem;
+  }
+  .stat-card {
+    background: #13131a;
+    border: 1px solid #2a2a3a;
+    border-radius: 12px;
+    padding: 1rem;
+  }
+  .stat-card .label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #7a7a9a;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #fff;
+  }
+  .stat-card.red .value  { color: #e63946; }
+  .stat-card.grn .value  { color: #39d98a; }
+  .stat-card.amb .value  { color: #f4a836; }
+
+  /* Table */
+  .table-wrap {
+    background: #13131a;
+    border: 1px solid #2a2a3a;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .table-header {
+    background: #1a1a26;
+    padding: 0.75rem 1.2rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #7a7a9a;
+    border-bottom: 1px solid #2a2a3a;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+  }
+  thead th {
+    background: #16161f;
+    padding: 0.65rem 1rem;
+    text-align: left;
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: #7a7a9a;
+    border-bottom: 1px solid #2a2a3a;
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid #1e1e2a;
+    animation: slideIn 0.4s ease both;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  @keyframes slideIn {
+    from { opacity: 0; background: #1e3a2a; }
+    to   { opacity: 1; background: transparent; }
+  }
+  tbody td {
+    padding: 0.75rem 1rem;
+    color: #c8c8d8;
+    vertical-align: top;
+  }
+  .ip-cell { color: #f4a836; font-weight: 700; }
+  .device-cell { color: #e8e8f0; }
+  .num-cell {
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+  }
+
+  /* Empty state */
+  #empty {
+    padding: 3rem;
+    text-align: center;
+    color: #7a7a9a;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.85rem;
+  }
+  #empty .big { font-size: 2rem; margin-bottom: 1rem; }
+
+  .refresh-info {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #4a4a6a;
+    text-align: center;
+    margin-top: 1rem;
+  }
+
+  /* New visitor flash */
+  .flash {
+    position: fixed;
+    top: 1.5rem; right: 1.5rem;
+    background: #e63946;
+    color: #fff;
+    padding: 0.75rem 1.2rem;
+    border-radius: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 700;
+    opacity: 0;
+    transform: translateY(-8px);
+    transition: opacity 0.3s, transform 0.3s;
+    z-index: 999;
+    pointer-events: none;
+  }
+  .flash.show { opacity: 1; transform: translateY(0); }
+</style>
+</head>
+<body>
+
+<div class="flash" id="flash">NEW VISITOR DETECTED</div>
+
+<header>
+  <div class="header-left">
+    <h1>Workshop Admin Dashboard</h1>
+    <p>LIVE VISITOR TRACKER — FOR PRESENTER ONLY</p>
+  </div>
+  <div class="live-badge">
+    <span class="live-dot"></span>
+    LIVE
+  </div>
+</header>
+
+<div class="stats">
+  <div class="stat-card red">
+    <div class="label">Total Scans</div>
+    <div class="value" id="stat-total">0</div>
+  </div>
+  <div class="stat-card amb">
+    <div class="label">Countries</div>
+    <div class="value" id="stat-countries">0</div>
+  </div>
+  <div class="stat-card grn">
+    <div class="label">Devices</div>
+    <div class="value" id="stat-devices">0</div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <div class="table-header">
+    <span class="live-dot"></span>
+    Captured Visitors — updating every 3 seconds
+  </div>
+
+  <div id="empty">
+    <div class="big">&#8987;</div>
+    Waiting for first scan...
+  </div>
+
+  <table id="visitor-table" style="display:none;">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Time</th>
+        <th>IP Address</th>
+        <th>City</th>
+        <th>Country</th>
+        <th>Device</th>
+        <th>OS</th>
+        <th>Browser</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</div>
+
+<div class="refresh-info">Auto-refreshes every 3 seconds</div>
+
+<script>
+  // ─────────────────────────────────────────────
+  //  REPLACE THIS WITH YOUR FIREBASE DATABASE URL
+  const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/";
+  // ─────────────────────────────────────────────
+
+  let lastCount = 0;
+
+  async function fetchVisitors() {
+    try {
+      const r = await fetch(`${FIREBASE_URL}/visitors.json`);
+      const data = await r.json();
+
+      if (!data) {
+        document.getElementById('empty').style.display = 'block';
+        document.getElementById('visitor-table').style.display = 'none';
+        return;
+      }
+
+      const entries = Object.values(data).reverse();
+
+      // Update stats
+      const countries = new Set(entries.map(e => e.country)).size;
+      const devices   = new Set(entries.map(e => e.device)).size;
+      document.getElementById('stat-total').textContent     = entries.length;
+      document.getElementById('stat-countries').textContent = countries;
+      document.getElementById('stat-devices').textContent   = devices;
+
+      // Flash on new visitor
+      if (lastCount > 0 && entries.length > lastCount) {
+        const flash = document.getElementById('flash');
+        flash.classList.add('show');
+        setTimeout(() => flash.classList.remove('show'), 2500);
+      }
+      lastCount = entries.length;
+
+      // Render rows
+      document.getElementById('empty').style.display = 'none';
+      document.getElementById('visitor-table').style.display = 'table';
+
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = '';
+      entries.forEach((e, i) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="num-cell">${entries.length - i}</td>
+          <td>${e.time || '—'}</td>
+          <td class="ip-cell">${e.ip || '—'}</td>
+          <td>${e.city || '—'}</td>
+          <td>${e.country || '—'}</td>
+          <td class="device-cell">${e.device || '—'}</td>
+          <td>${e.os || '—'}</td>
+          <td>${e.browser || '—'}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+    } catch(err) {
+      console.error('Firebase fetch error:', err);
+    }
+  }
+
+  fetchVisitors();
+  setInterval(fetchVisitors, 3000);
+</script>
+</body>
+</html>
